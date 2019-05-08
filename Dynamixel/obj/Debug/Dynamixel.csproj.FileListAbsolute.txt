@@ -1,0 +1,14 @@
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.csprojAssemblyReference.cache
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.FormMain.resources
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.FormDynamixelConfig.resources
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.Properties.Resources.resources
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.UCServoPort.resources
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.csproj.GenerateResource.cache
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.csproj.CoreCompileInputs.cache
+C:\Users\Public\Documents\EZ-Builder\Plugins\5edbbb5d-d9ef-4440-9ecf-858ec24b8746\title.png
+C:\Users\Public\Documents\EZ-Builder\Plugins\5edbbb5d-d9ef-4440-9ecf-858ec24b8746\plugin.xml
+C:\Users\Public\Documents\EZ-Builder\Plugins\5edbbb5d-d9ef-4440-9ecf-858ec24b8746\Dynamixel.dll.config
+C:\Users\Public\Documents\EZ-Builder\Plugins\5edbbb5d-d9ef-4440-9ecf-858ec24b8746\Dynamixel.dll
+C:\Users\Public\Documents\EZ-Builder\Plugins\5edbbb5d-d9ef-4440-9ecf-858ec24b8746\Dynamixel.pdb
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.dll
+C:\My Documents\SVN\Developer - Windows\EZ-Builder Plugins\Dynamixel\Dynamixel\obj\Debug\Dynamixel.pdb

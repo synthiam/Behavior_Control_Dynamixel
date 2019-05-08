@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<PluginV1XML xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <FRIENDLY_NAME>Dynamixel</FRIENDLY_NAME>
+  <DLL_FILENAME>Dynamixel.dll</DLL_FILENAME>
+  <AUTHOR_NAME>DJ Sures</AUTHOR_NAME>
+  <LICENSE_URL>http://www.ez-robot.com/tutorials/plugin-license.aspx</LICENSE_URL>
+  <PLUGIN_GUID>5edbbb5d-d9ef-4440-9ecf-858ec24b8746</PLUGIN_GUID>
+  <CATEGORY_TYPE>Servo</CATEGORY_TYPE>
+  <DESCRIPTION>Control Dynamixel servos from Robotis from your EZ-B v4</DESCRIPTION>
+  <VersionRelease>24</VersionRelease>
+</PluginV1XML>
