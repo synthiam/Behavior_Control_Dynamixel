@@ -7,6 +7,6 @@ The compiled installer for this control is available for EZ-Builder here: https:
 
 For profit use of these files requires written consent. Contact partners@synthiam.com. For everyone else, party on!
 
-Please see LICENSE.md for license details.
+Please see [LICENSE.md](https://github.com/synthiam/Behavior_Control_Dynamixel/blob/master/LICENSE.md) for license details.
 
 Synthiam Website: https://synthiam.com
