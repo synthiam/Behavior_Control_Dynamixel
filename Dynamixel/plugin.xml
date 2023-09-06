@@ -6,6 +6,6 @@
   <LICENSE_URL>http://www.ez-robot.com/tutorials/plugin-license.aspx</LICENSE_URL>
   <PLUGIN_GUID>5edbbb5d-d9ef-4440-9ecf-858ec24b8746</PLUGIN_GUID>
   <CATEGORY_TYPE>Servo</CATEGORY_TYPE>
-  <DESCRIPTION>Control Dynamixel servos from Robotis from your EZ-B v4</DESCRIPTION>
-  <VersionRelease>24</VersionRelease>
+  <DESCRIPTION>Control Dynamixel servos from Robotis from ARC</DESCRIPTION>
+  <VersionRelease>47</VersionRelease>
 </PluginV1XML>

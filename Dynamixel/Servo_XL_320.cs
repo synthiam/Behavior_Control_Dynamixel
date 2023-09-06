@@ -96,7 +96,7 @@ namespace Dynamixel {
       return txbuffer.ToArray();
     }
 
-    private byte[] CreateDynamixelCommand(byte id, byte instruction, int address, int value) {
+    public byte[] CreateDynamixelCommandByte(byte id, byte instruction, int address, int value) {
 
       List<byte> txbuffer = new List<byte>();
 
@@ -122,7 +122,7 @@ namespace Dynamixel {
 
     public byte[] ReleaseServo(byte id) {
 
-      return CreateDynamixelCommand(id, 3, 24, 0x00);
+      return CreateDynamixelCommandByte(id, 3, 24, 0x00);
     }
 
     public byte[] MoveServoCmd(byte id, int position) {
@@ -130,7 +130,7 @@ namespace Dynamixel {
       if (position < 0)
         position = 0;
 
-      return CreateDynamixelCommand(id, 3, 30, position);
+      return CreateDynamixelCommandByte(id, 3, 30, position);
     }
 
     public byte[] ServoSpeed(byte id, int speed) {
@@ -138,19 +138,19 @@ namespace Dynamixel {
       if (speed < 0)
         speed = 0;
 
-      return CreateDynamixelCommand(id, 3, 32, speed);
+      return CreateDynamixelCommandByte(id, 3, 32, speed);
     }
 
     public byte[] LED(byte id, bool status) {
 
       List<byte> buffer = new List<byte>();
 
-      return CreateDynamixelCommand(id, 3, 25, status ? 1 : 0);
+      return CreateDynamixelCommandByte(id, 3, 25, status ? 1 : 0);
     }
 
     public byte[] DisableStatusPacket(byte id) {
 
-      return CreateDynamixelCommand(id, 0x03, 17, 1);
+      return CreateDynamixelCommandByte(id, 0x03, 17, 1);
     }
 
     public byte[] DisableStatusPacketForAll() {
@@ -160,7 +160,7 @@ namespace Dynamixel {
 
     public byte[] ChangeID(byte fromId, byte toId) {
 
-      return CreateDynamixelCommand(fromId, 3, 3, toId);
+      return CreateDynamixelCommandByte(fromId, 3, 3, toId);
     }
 
     public byte[] SendPing(byte id) {
@@ -170,7 +170,7 @@ namespace Dynamixel {
 
     public byte[] GetCurrentPositionCmd(byte id) {
 
-      return CreateDynamixelCommand(id, 2, 37, 2);
+      return CreateDynamixelCommandByte(id, 2, 37, 2);
     }
   }
 }

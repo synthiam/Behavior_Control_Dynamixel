@@ -74,7 +74,7 @@ namespace Dynamixel {
       return txbuffer.ToArray();
     }
 
-    private byte[] CreateDynamixelCommand(byte id, byte instruction, int address) {
+    public byte[] CreateDynamixelCommand(byte id, byte instruction, int address) {
 
       List<byte> txbuffer = new List<byte>();
 
@@ -96,7 +96,7 @@ namespace Dynamixel {
       return txbuffer.ToArray();
     }
 
-    private byte[] CreateDynamixelCommandUInt32(byte id, byte instruction, int address, int value) {
+    public byte[] CreateDynamixelCommandInt32(byte id, byte instruction, int address, Int32 value) {
 
       List<byte> txbuffer = new List<byte>();
 
@@ -120,7 +120,7 @@ namespace Dynamixel {
       return txbuffer.ToArray();
     }
 
-    private byte[] CreateDynamixelCommandByte(byte id, byte instruction, int address, byte value) {
+    public byte[] CreateDynamixelCommandByte(byte id, byte instruction, int address, byte value) {
 
       List<byte> txbuffer = new List<byte>();
 
@@ -144,7 +144,7 @@ namespace Dynamixel {
       return txbuffer.ToArray();
     }
 
-    private byte[] CreateDynamixelCommand(byte id, byte instruction, int address, int value) {
+    public byte[] CreateDynamixelCommandUInt16(byte id, byte instruction, int address, UInt16 value) {
 
       List<byte> txbuffer = new List<byte>();
 
@@ -173,12 +173,22 @@ namespace Dynamixel {
       return TorqueEnable(id, false);
     }
 
+    public byte[] SetOperatingMode(byte id, ConfigServos.OperatingModeEnum operatingMode) {
+
+      return CreateDynamixelCommandByte(id, 3, 11, (byte)operatingMode);
+    }
+
+    public byte[] GoalVelocity(byte id, Int32 speed) {
+
+      return CreateDynamixelCommandInt32(id, 3, 104, speed);
+    }
+
     public byte[] MoveServoCmd(byte id, int position) {
 
       if (position < 0)
         position = 0;
 
-      return CreateDynamixelCommandUInt32(id, 3, 116, position);
+      return CreateDynamixelCommandInt32(id, 3, 116, position);
     }
 
     public byte[] ServoSpeed(byte id, int speed) {
@@ -186,7 +196,23 @@ namespace Dynamixel {
       if (speed < 0)
         speed = 0;
 
-      return CreateDynamixelCommandUInt32(id, 3, 104, speed);
+      return CreateDynamixelCommandInt32(id, 3, 104, speed);
+    }
+
+    public byte[] ServoVelocity(byte id, int velocity) {
+
+      if (velocity < 0)
+        velocity = 0;
+
+      return CreateDynamixelCommandInt32(id, 3, 112, velocity);
+    }
+
+    public byte[] ServoAcceleration(byte id, int acceleration) {
+
+      if (acceleration < 0)
+        acceleration = 0;
+
+      return CreateDynamixelCommandInt32(id, 3, 108, acceleration);
     }
 
     public byte[] TorqueEnable(byte id, bool status) {
@@ -225,7 +251,7 @@ namespace Dynamixel {
 
     public byte[] GetCurrentPositionCmd(byte id) {
 
-      return CreateDynamixelCommand(id, 2, 132, 4);
+      return CreateDynamixelCommandUInt16(id, 2, 132, 4);
     }
   }
 }

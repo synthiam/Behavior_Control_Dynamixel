@@ -2,6 +2,10 @@
 <Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <StartAction>Program</StartAction>
-    <StartProgram>C:\Program Files %28x86%29\Synthiam Inc\EZ-Builder\EZ-Builder.exe</StartProgram>
+    <StartProgram>C:\Program Files %28x86%29\Synthiam Inc\ARC by Synthiam\ARC.exe</StartProgram>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <StartAction>Program</StartAction>
+    <StartProgram>C:\Program Files %28x86%29\Synthiam Inc\ARC by Synthiam\ARC.exe</StartProgram>
   </PropertyGroup>
 </Project>

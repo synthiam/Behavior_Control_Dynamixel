@@ -34,6 +34,45 @@ namespace Dynamixel {
       return bList.ToArray();
     }
 
+    public byte[] CreateDynamixelCommandInt32(byte id, byte instruction, byte address, Int32 value) {
+
+      List<byte> buffer = new List<byte>();
+
+      buffer.Add(instruction);
+
+      buffer.Add(address);
+
+      buffer.AddRange(BitConverter.GetBytes((Int32)value));
+
+      return createDynamixelCommand(id, buffer.ToArray());
+    }
+
+    public byte[] CreateDynamixelCommandByte(byte id, byte instruction, byte address, byte value) {
+
+      List<byte> buffer = new List<byte>();
+
+      buffer.Add(instruction);
+
+      buffer.Add(address);
+
+      buffer.Add(value);
+
+      return createDynamixelCommand(id, buffer.ToArray());
+    }
+
+    public byte[] CreateDynamixelCommandUInt16(byte id, byte instruction, byte address, UInt16 value) {
+
+      List<byte> buffer = new List<byte>();
+
+      buffer.Add(instruction);
+
+      buffer.Add(address);
+
+      buffer.AddRange(BitConverter.GetBytes((UInt16)value));
+
+      return createDynamixelCommand(id, buffer.ToArray());
+    }
+
     public enum BAUD_RATES {
       BAUD_1000000 = 1,
       BAUD_500000 = 3,

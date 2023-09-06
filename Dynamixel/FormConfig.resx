@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -117,4 +117,18 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="label6.Text" xml:space="preserve">
+    <value>*Note: 
+
+1) if any changes are performed on this Setting tab, the SAVE button must be pressed before using features in the Utilities tab.
+
+2) check the manual for UART ports that are used for differnet hardware (i.e. OpenCR, OpenCM, EZ-B v4, etc.)</value>
+  </data>
+  <data name="ucHelpHover2.SetHelpText" xml:space="preserve">
+    <value>Specify the baud rate (bps) for the dynamixel communication.
+
+If you change the baud rate, the Set Baud Rate button must be pressed to initialize the new baud rate in the EZ-B. 
+
+When the plugin is loaded, the last set baud rate will be used. This means you do not need to press this button again when the plugin is loaded with the project in the future. The Set Baud Rate button only needs to be pressed when the baud rate changes.</value>
+  </data>
 </root>

@@ -13,11 +13,21 @@ namespace Dynamixel {
 
       cbEnabled_CheckedChanged(null, null);
 
+      cbVersion.BeginUpdate();
       cbVersion.Items.Clear();
       foreach (ConfigServos.ServoTypeEnum v in Enum.GetValues(typeof(ConfigServos.ServoTypeEnum)))
         cbVersion.Items.Add(v);
 
       cbVersion.SelectedItem = ConfigServos.ServoTypeEnum.AX_12;
+      cbVersion.EndUpdate();
+
+      cbOperatingMode.BeginUpdate();
+      cbOperatingMode.Items.Clear();
+      foreach (ConfigServos.OperatingModeEnum v in Enum.GetValues(typeof(ConfigServos.OperatingModeEnum)))
+        cbOperatingMode.Items.Add(v);
+
+      cbOperatingMode.SelectedItem = ConfigServos.OperatingModeEnum.Position;
+      cbOperatingMode.EndUpdate();
     }
 
     public EZ_B.Servo.ServoPortEnum SetPort {
@@ -56,6 +66,15 @@ namespace Dynamixel {
       }
       set {
         cbVersion.SelectedItem = value;
+      }
+    }
+
+    public ConfigServos.OperatingModeEnum SetOperatingMode {
+      get {
+        return (ConfigServos.OperatingModeEnum)cbOperatingMode.SelectedItem;
+      }
+      set {
+        cbOperatingMode.SelectedItem = value;
       }
     }
 

@@ -2,6 +2,11 @@
 
   public class ConfigServos {
 
+    public enum OperatingModeEnum {
+      Wheeled = 1,
+      Position = 3
+    }
+
     public enum ServoTypeEnum {
       AX_12,
       XL_320,
@@ -25,5 +30,6 @@
     public EZ_B.Servo.ServoPortEnum Port;
     public ConfigServos.ServoTypeEnum ServoType;
     public int MaxPosition;
+    public ConfigServos.OperatingModeEnum OperatingMode = ConfigServos.OperatingModeEnum.Position;
   }
 }

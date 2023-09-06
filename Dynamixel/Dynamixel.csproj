@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Dynamixel</RootNamespace>
     <AssemblyName>Dynamixel</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
     <NuGetPackageImportStamp>
@@ -20,16 +20,16 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\..\..\..\..\Users\Public\Documents\EZ-Builder\Plugins\5edbbb5d-d9ef-4440-9ecf-858ec24b8746\</OutputPath>
+    <OutputPath>C:\ProgramData\ARC\Plugins\5edbbb5d-d9ef-4440-9ecf-858ec24b8746\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x86</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>..\..\..\..\..\..\ProgramData\ARC\Plugins\5edbbb5d-d9ef-4440-9ecf-858ec24b8746\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -38,12 +38,12 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="EZ-Builder">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Synthiam Inc\EZ-Builder\EZ-Builder.exe</HintPath>
+    <Reference Include="ARC">
+      <HintPath>C:\Program Files (x86)\Synthiam Inc\ARC by Synthiam\ARC.exe</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="EZ_B">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Synthiam Inc\EZ-Builder\EZ_B.dll</HintPath>
+      <HintPath>C:\Program Files (x86)\Synthiam Inc\ARC by Synthiam\EZ_B.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />
@@ -66,11 +66,11 @@
     <Compile Include="FormMain.Designer.cs">
       <DependentUpon>FormMain.cs</DependentUpon>
     </Compile>
-    <Compile Include="FormDynamixelConfig.cs">
+    <Compile Include="FormConfig.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="FormDynamixelConfig.designer.cs">
-      <DependentUpon>FormDynamixelConfig.cs</DependentUpon>
+    <Compile Include="FormConfig.designer.cs">
+      <DependentUpon>FormConfig.cs</DependentUpon>
     </Compile>
     <Compile Include="GetLoadResponseCls.cs" />
     <Compile Include="GlobalSuppressions.cs" />
@@ -85,8 +85,8 @@
     <EmbeddedResource Include="FormMain.resx">
       <DependentUpon>FormMain.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="FormDynamixelConfig.resx">
-      <DependentUpon>FormDynamixelConfig.cs</DependentUpon>
+    <EmbeddedResource Include="FormConfig.resx">
+      <DependentUpon>FormConfig.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
