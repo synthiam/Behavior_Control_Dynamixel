@@ -4,21 +4,92 @@ using System.Windows.Forms;
 using EZ_B;
 using ARC;
 using ARC.Scripting.EZScript;
+using System.Linq;
+using ARC.UCForms.Cls;
+using System.Threading;
 
 namespace Dynamixel {
 
   public partial class FormMain : ARC.UCForms.FormPluginMaster {
 
-    Servo_AX12 _servo_AX12 = new Servo_AX12();
-    Servo_XL_320 _servoXL_320 = new Servo_XL_320();
-    Servo_xl430_w250_t _servoXL430_w250_t = new Servo_xl430_w250_t();
+    Servo_AX12         _servo_AX12;
+    Servo_XL_320       _servoXL_320;
+    Servo_xl430_w250_t _servoXL430_w250_t;
 
     // This is a duplicate of the _cf.CustomObjectv2 for performance
-    ConfigServos _servoConfig = new ConfigServos();
+    ConfigServos _configServos = new ConfigServos();
 
     public FormMain() {
 
       InitializeComponent();
+    }
+
+    private void Form1_Load(object sender, EventArgs e) {
+
+      displayVersion();
+
+      _servo_AX12 = new Servo_AX12();
+      _servo_AX12.OnCommunication += onCommunication;
+
+      _servoXL_320 = new Servo_XL_320();
+      _servoXL_320.OnCommunication += onCommunication;
+
+      _servoXL430_w250_t = new Servo_xl430_w250_t();
+      _servoXL430_w250_t.OnCommunication += onCommunication;
+
+      // Bind to the events for moving a servo and changing connection state
+      EZBManager.EZBs[0].OnConnectionChange += FormMain_OnConnectionChange;
+      EZBManager.EZBs[0].Servo.OnServoMove += Servo_OnServoMove;
+      EZBManager.EZBs[0].Servo.OnServoRelease += Servo_OnServoRelease;
+      EZBManager.EZBs[0].Servo.OnServoSpeed += Servo_OnServoSpeed;
+      EZBManager.EZBs[0].Servo.OnServoGetPosition += Servo_OnServoGetPosition;
+      EZBManager.EZBs[0].Servo.OnServoAcceleration += Servo_OnServoAcceleration;
+      EZBManager.EZBs[0].Servo.OnServoVelocity += Servo_OnServoVelocity;
+
+      Invokers.SetAppendText(tbLog, true, "Connected Events");
+    }
+
+    private void FormMain_FormClosing(object sender, FormClosingEventArgs e) {
+
+      EZBManager.EZBs[0].OnConnectionChange -= FormMain_OnConnectionChange;
+      EZBManager.EZBs[0].Servo.OnServoMove -= Servo_OnServoMove;
+      EZBManager.EZBs[0].Servo.OnServoRelease -= Servo_OnServoRelease;
+      EZBManager.EZBs[0].Servo.OnServoSpeed -= Servo_OnServoSpeed;
+      EZBManager.EZBs[0].Servo.OnServoGetPosition -= Servo_OnServoGetPosition;
+      EZBManager.EZBs[0].Servo.OnServoAcceleration -= Servo_OnServoAcceleration;
+      EZBManager.EZBs[0].Servo.OnServoVelocity -= Servo_OnServoVelocity;
+
+      _servo_AX12.OnCommunication -= onCommunication;
+      _servoXL_320.OnCommunication -= onCommunication;
+      _servoXL430_w250_t.OnCommunication -= onCommunication;
+    }
+
+    private void onCommunication(object sender, OnCommCls e) {
+
+      bool debug = Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]);
+
+      if (((ConfigTitles.PortTypeEnum)_cf.STORAGE[ConfigTitles.PORT_TYPE]) == ConfigTitles.PortTypeEnum.DigitalPort)
+        throw new Exception("This feature is only available when using the hardware uart");
+
+      if (debug)
+        Invokers.SetAppendText(tbLog, true, $"Performing a request to servo...");
+
+      // initialize the servo only to flush the data buffer, skip sending config data
+      initUART(true);
+
+      serialWrite(e.SendBytes);
+
+      System.Threading.Thread.Sleep(500);
+
+      var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
+
+      if (debug)
+        Invokers.SetAppendText(tbLog, true, $"Read {ret.Length} bytes. Using last {e.SendBytes.Length - ret.Length} bytes.");
+
+      e.ResponseBytes = ret.Skip(e.SendBytes.Length).ToArray();
+
+      if (debug)
+        Invokers.SetAppendText(tbLog, true, $"Filtered response: {string.Join(" ", e.ResponseBytes.Select(b => b.ToString("x2")))}");
     }
 
     void displayVersion() {
@@ -36,42 +107,9 @@ namespace Dynamixel {
       }
     }
 
-    private void Form1_Load(object sender, EventArgs e) {
-
-      displayVersion();
-
-      // Bind to the events for moving a servo and changing connection state
-      EZBManager.EZBs[0].OnConnectionChange += FormMain_OnConnectionChange;
-      EZBManager.EZBs[0].Servo.OnServoMove += Servo_OnServoMove;
-      EZBManager.EZBs[0].Servo.OnServoRelease += Servo_OnServoRelease;
-      EZBManager.EZBs[0].Servo.OnServoSpeed += Servo_OnServoSpeed;
-      EZBManager.EZBs[0].Servo.OnServoGetPosition += Servo_OnServoGetPosition;
-      EZBManager.EZBs[0].Servo.OnServoAcceleration += Servo_OnServoAcceleration;
-      EZBManager.EZBs[0].Servo.OnServoVelocity += Servo_OnServoVelocity;
-
-      ExpressionEvaluation.FunctionEval.AdditionalFunctionEvent += FunctionEval_AdditionalFunctionEvent;
-
-      Invokers.SetAppendText(tbLog, true, "Connected Events");
-
-      if (EZBManager.EZBs[0].IsConnected)
-        initUART(false);
-    }
-
     void FormMain_OnConnectionChange(bool isConnected) {
 
       initUART(false);
-    }
-
-    private void FormMain_FormClosing(object sender, FormClosingEventArgs e) {
-
-      EZBManager.EZBs[0].OnConnectionChange -= FormMain_OnConnectionChange;
-      EZBManager.EZBs[0].Servo.OnServoMove -= Servo_OnServoMove;
-      EZBManager.EZBs[0].Servo.OnServoRelease -= Servo_OnServoRelease;
-      EZBManager.EZBs[0].Servo.OnServoSpeed -= Servo_OnServoSpeed;
-      EZBManager.EZBs[0].Servo.OnServoGetPosition -= Servo_OnServoGetPosition;
-      EZBManager.EZBs[0].Servo.OnServoAcceleration -= Servo_OnServoAcceleration;
-      EZBManager.EZBs[0].Servo.OnServoVelocity -= Servo_OnServoVelocity;
-      ExpressionEvaluation.FunctionEval.AdditionalFunctionEvent -= FunctionEval_AdditionalFunctionEvent;
     }
 
     EZ_B.Digital.DigitalPortEnum getDigitalPortIndex() {
@@ -110,44 +148,48 @@ namespace Dynamixel {
 
       if (!skipSettings) {
 
-        List<byte> cmdData = new List<byte>();
+        if (_configServos.Servos.Any(x => x.ServoType == ConfigServos.ServoTypeEnum.AX_12)) {
 
-        Invokers.SetAppendText(tbLog, true, "Disable Status Packet");
+          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+            Invokers.SetAppendText(tbLog, true, "Disabling status packet for AX12");
 
-        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-          Invokers.SetAppendText(tbLog, true, "Disabling status packet for AX12");
+          serialWrite(_servo_AX12.SetDisableStatusPacket(0xfe));
+        }
 
-        cmdData.AddRange(_servo_AX12.DisableStatusPacketForAll());
+        if (_configServos.Servos.Any(x => x.ServoType == ConfigServos.ServoTypeEnum.XL_320)) {
 
-        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-          Invokers.SetAppendText(tbLog, true, "Disabling status packet for XL320");
+          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+            Invokers.SetAppendText(tbLog, true, "Disabling status packet for XL320");
 
-        cmdData.AddRange(_servoXL_320.DisableStatusPacketForAll());
+          serialWrite(_servoXL_320.SetDisableStatusPacket(0xfe));
+        }
 
-        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-          Invokers.SetAppendText(tbLog, true, "Disabling status packet for XL430");
+        if (_configServos.Servos.Any(x => x.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)) {
 
-        cmdData.AddRange(_servoXL430_w250_t.DisableStatusPacketForAll());
+          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+            Invokers.SetAppendText(tbLog, true, "Disabling status packet for XL430_w250_t");
 
-        foreach (var servoConfig in _servoConfig.Servos)
+          serialWrite(_servoXL430_w250_t.SetDisableStatusPacket(0xfe, 1));
+        }
+
+        foreach (var servoConfig in _configServos.Servos)
           if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t) {
 
             if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
               Invokers.SetAppendText(tbLog, true, $"XL430 set operating mode {servoConfig.Port} {servoConfig.OperatingMode}");
 
-            cmdData.AddRange(_servoXL430_w250_t.SetOperatingMode(Utility.GetIdFromServo(servoConfig.Port), servoConfig.OperatingMode));
+            serialWrite(_servoXL430_w250_t.SetOperatingMode(Utility.GetIdFromServo(servoConfig.Port), (byte)servoConfig.OperatingMode));
           } else {
 
             if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-              Invokers.SetAppendText(tbLog, true, $"Setting operating mode is not implemented for {servoConfig.ServoType} {servoConfig.Port}. Using default mode (Position mode?)");
+              Invokers.SetAppendText(tbLog, true, $"Setting operating mode is not implemented for {servoConfig.ServoType} {servoConfig.Port}. Request it on the Synthiam Community Forum. Using default mode (Position mode?)");
           }
-
-        if (cmdData.Count != 0)
-          serialWrite(cmdData.ToArray());
       }
     }
 
     public override void SetConfiguration(ARC.Config.Sub.PluginV1 cf) {
+
+      base.SetConfiguration(cf);
 
       cf.STORAGE.AddIfNotExist(ConfigTitles.BAUD_RATE, 1000000);
 
@@ -159,24 +201,20 @@ namespace Dynamixel {
 
       // If the servo config is empty, assign a blank one
       if (cf._customObjectEncodedV2.Length == 0)
-        cf.SetCustomObjectV2(_servoConfig);
+        cf.SetCustomObjectV2(_configServos);
 
-      _servoConfig = (ConfigServos)cf.GetCustomObjectV2(typeof(ConfigServos));
+      _configServos = (ConfigServos)cf.GetCustomObjectV2(typeof(ConfigServos));
 
-      base.SetConfiguration(cf);
-    }
-
-    public override ARC.Config.Sub.PluginV1 GetConfiguration() {
-
-      _cf.SetCustomObjectV2(_servoConfig);
-
-      return base.GetConfiguration();
+      initUART(false);
     }
 
     void serialWrite(byte[] data) {
 
       if (!EZBManager.PrimaryEZB.IsConnected)
         return;
+
+      if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+        Invokers.SetAppendText(tbLog, true, $"Sending: {string.Join(" ", data.Select(b => b.ToString("x2")))}");
 
       if (((ConfigTitles.PortTypeEnum)_cf.STORAGE[ConfigTitles.PORT_TYPE]) == ConfigTitles.PortTypeEnum.DigitalPort) {
 
@@ -187,9 +225,200 @@ namespace Dynamixel {
 
         EZBManager.PrimaryEZB.Uart.UARTExpansionWrite(getUARTIndex(), data);
       }
+
+      System.Threading.Thread.Sleep(10);
     }
 
-    public override void SendCommand(string windowCommand, params string[] values) {
+    public override object SendCommandV2(CancellationToken cancellationToken, string windowCommand, params string[] values) {
+
+      if (windowCommand.Equals("ReadRam", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 3)
+          throw new Exception(string.Format("Expecting 3 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        byte id = Utility.GetIdFromServo(port);
+
+        byte address = Convert.ToByte(values[1]);
+
+        byte bytesToRead = Convert.ToByte(values[2]);
+
+        var servoConfig = _configServos.GetPort(port);
+
+        if (servoConfig == null)
+          throw new Exception($"There is no dynamixel servo configured for port {port}");
+
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          return _servo_AX12.GetRam(id, address, bytesToRead);
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          return _servoXL430_w250_t.GetRam(id, address, bytesToRead);
+
+        throw new Exception("Not implemented. Ask us on the synthiam community forum to add this if you need it");
+      }
+
+      if (windowCommand.Equals("ReadRamByte", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 2)
+          throw new Exception(string.Format("Expecting 2 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        byte id = Utility.GetIdFromServo(port);
+
+        byte address = Convert.ToByte(values[1]);
+
+        var servoConfig = _configServos.GetPort(port);
+
+        if (servoConfig == null)
+          throw new Exception($"There is no dynamixel servo configured for port {port}");
+
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          return _servo_AX12.GetRam(id, address, 1)[0];
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          return _servoXL430_w250_t.GetRam(id, address, 1)[0];
+
+        throw new Exception("Not implemented. Ask us on the synthiam community forum to add this if you need it");
+      }
+
+      if (windowCommand.Equals("ReadRamInt16", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 2)
+          throw new Exception(string.Format("Expecting 2 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        byte id = Utility.GetIdFromServo(port);
+
+        byte address = Convert.ToByte(values[1]);
+
+        var servoConfig = _configServos.GetPort(port);
+
+        if (servoConfig == null)
+          throw new Exception($"There is no dynamixel servo configured for port {port}");
+
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          return BitConverter.ToInt16(_servo_AX12.GetRam(id, address, 2), 0);
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          return BitConverter.ToInt16(_servoXL430_w250_t.GetRam(id, address, 2), 0);
+
+        throw new Exception("Not implemented. Ask us on the synthiam community forum to add this if you need it");
+      }
+
+      if (windowCommand.Equals("ReadRamUInt16", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 2)
+          throw new Exception(string.Format("Expecting 2 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        byte id = Utility.GetIdFromServo(port);
+
+        byte address = Convert.ToByte(values[1]);
+
+        var servoConfig = _configServos.GetPort(port);
+
+        if (servoConfig == null)
+          throw new Exception($"There is no dynamixel servo configured for port {port}");
+
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          return BitConverter.ToUInt16(_servo_AX12.GetRam(id, address, 2), 0);
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          return BitConverter.ToUInt16(_servoXL430_w250_t.GetRam(id, address, 2), 0);
+
+        throw new Exception("Not implemented. Ask us on the synthiam community forum to add this if you need it");
+      }
+
+      if (windowCommand.Equals("ReadRamInt32", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 2)
+          throw new Exception(string.Format("Expecting 2 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        byte id = Utility.GetIdFromServo(port);
+
+        byte address = Convert.ToByte(values[1]);
+
+        var servoConfig = _configServos.GetPort(port);
+
+        if (servoConfig == null)
+          throw new Exception($"There is no dynamixel servo configured for port {port}");
+
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          return BitConverter.ToInt32(_servo_AX12.GetRam(id, address, 4), 0);
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          return BitConverter.ToInt32(_servoXL430_w250_t.GetRam(id, address, 4), 0);
+
+        throw new Exception("Not implemented. Ask us on the synthiam community forum to add this if you need it");
+      }
+
+      if (windowCommand.Equals("GetDynamixelTemp", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 1)
+          throw new Exception(string.Format("Expecting 1 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        return getServoTemp(port);
+      }
+
+      if (windowCommand.Equals("GetDynamixelLoadDir", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 1)
+          throw new Exception(string.Format("Expecting 1 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        return getLoad(port).LoadDirection.ToString();
+      }
+
+      if (windowCommand.Equals("GetDynamixelLoad", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 1)
+          throw new Exception(string.Format("Expecting 1 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        return getLoad(port).Load;
+      }
+
+      if (windowCommand.Equals("GetDynamixelPing", StringComparison.InvariantCultureIgnoreCase)) {
+
+        if (values.Length != 1)
+          throw new Exception(string.Format("Expecting 1 parameter, you passed {0}", values.Length));
+
+        Servo.ServoPortEnum port = new HelperPortParser(values[0]).ServoPort;
+
+        if (port < EZ_B.Servo.ServoPortEnum.V1 || port > EZ_B.Servo.ServoPortEnum.V99)
+          throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
+
+        return getServoPing(port);
+      }
 
       if (windowCommand.Equals("setled", StringComparison.InvariantCultureIgnoreCase)) {
 
@@ -203,7 +432,7 @@ namespace Dynamixel {
 
         bool status = Helper.GetTrueOrFalse(values[1]) == Helper.TrueFalseEnum.True;
 
-        var servoConfig = _servoConfig.GetPort(servoPort);
+        var servoConfig = _configServos.GetPort(servoPort);
 
         if (servoConfig == null)
           throw new Exception(string.Format("Virtual Servo {0} is not configured for dynamixel usage", servoPort));
@@ -211,13 +440,18 @@ namespace Dynamixel {
         if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
           Invokers.SetAppendText(tbLog, true, $"Setting LED on {servoPort} to {status}");
 
+        var id = Utility.GetIdFromServo(servoPort);
         if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
-          serialWrite(_servo_AX12.LED(Utility.GetIdFromServo(servoPort), status));
+          serialWrite(_servo_AX12.SetLED(id, status));
         else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
-          serialWrite(_servoXL430_w250_t.LED(Utility.GetIdFromServo(servoPort), status));
+          serialWrite(_servoXL430_w250_t.SetLED(id, (byte)(status ? 1 : 0)));
         else
-          serialWrite(_servoXL_320.LED(Utility.GetIdFromServo(servoPort), status));
-      } else if (windowCommand.Equals("TorqueEnable", StringComparison.InvariantCultureIgnoreCase)) {
+          serialWrite(_servoXL_320.SetLED(id, status));
+
+        return true;
+      }
+
+      if (windowCommand.Equals("TorqueEnable", StringComparison.InvariantCultureIgnoreCase)) {
 
         if (values.Length != 2)
           throw new Exception(string.Format("Expecting 2 parameters, you passed {0}", values.Length));
@@ -229,7 +463,7 @@ namespace Dynamixel {
         if (servoPort < EZ_B.Servo.ServoPortEnum.V1 || servoPort > EZ_B.Servo.ServoPortEnum.V99)
           throw new Exception("Only virtual servos are supported for dynamixel. Virtual servos start with a 'v', such as v1, v2, v3..");
 
-        var servoConfig = _servoConfig.GetPort(servoPort);
+        var servoConfig = _configServos.GetPort(servoPort);
 
         if (servoConfig == null)
           throw new Exception(string.Format("Virtual Servo {0} is not configured for dynamixel usage", servoPort));
@@ -239,13 +473,17 @@ namespace Dynamixel {
 
         if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.XL_320) {
 
-          serialWrite(_servoXL430_w250_t.TorqueEnable(Utility.GetIdFromServo(servoPort), status));
+          serialWrite(_servoXL430_w250_t.SetTorqueEnable(Utility.GetIdFromServo(servoPort), (byte)(status ? 1 : 0)));
         } else {
 
           if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
             Invokers.SetAppendText(tbLog, true, $"Torque enable command not implemented for {servoConfig.ServoType}");
         }
-      } else if (windowCommand.StartsWith("WriteRam", StringComparison.InvariantCultureIgnoreCase)) {
+
+        return true;
+      }
+
+      if (windowCommand.StartsWith("WriteRam", StringComparison.InvariantCultureIgnoreCase)) {
 
         if (values.Length != 3)
           throw new Exception(string.Format("Expecting 3 parameters, you passed {0}", values.Length));
@@ -259,7 +497,7 @@ namespace Dynamixel {
 
         var servoId = Utility.GetIdFromServo(servoPort);
 
-        var servoConfig = _servoConfig.GetPort(servoPort);
+        var servoConfig = _configServos.GetPort(servoPort);
 
         if (servoConfig == null)
           throw new Exception(string.Format("Virtual Servo {0} is not configured for dynamixel usage", servoPort));
@@ -272,7 +510,7 @@ namespace Dynamixel {
           if (windowCommand.Equals("WriteRamByte", StringComparison.InvariantCultureIgnoreCase))
             serialWrite(_servoXL430_w250_t.CreateDynamixelCommandByte(servoId, 0x03, address, Convert.ToByte(values[2])));
           else if (windowCommand.Equals("WriteRamUInt16", StringComparison.InvariantCultureIgnoreCase))
-            serialWrite(_servoXL430_w250_t.CreateDynamixelCommandUInt16(servoId, 0x03, address, Convert.ToUInt16(values[2])));
+            serialWrite(_servoXL430_w250_t.CreateDynamixelCommandUInt16(servoId, 0x03, (ushort)address, Convert.ToUInt16(values[2])));
           else if (windowCommand.Equals("WriteRamInt32", StringComparison.InvariantCultureIgnoreCase))
             serialWrite(_servoXL430_w250_t.CreateDynamixelCommandInt32(servoId, 0x03, address, Convert.ToInt32(values[2])));
           else
@@ -299,23 +537,158 @@ namespace Dynamixel {
           if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
             Invokers.SetAppendText(tbLog, true, $"Torque enable command not implemented for {servoConfig.ServoType}");
         }
-      } else {
 
-        base.SendCommand(windowCommand, values);
+        return true;
       }
+
+      return base.SendCommandV2(cancellationToken, windowCommand, values);
     }
 
-    public override object[] GetSupportedControlCommands() {
+    public override void GetSupportedControlCommandsV2(List<GetSupportedControlCommandsDefCls> items) {
 
-      List<string> cmds = new List<string>();
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "SetLED",
+          Params = new string[] {
+            "ServoPort",
+            "true|false"
+            },
+          Description = "Set the LED state of the servo to on or off by passing true or false",
+        });
 
-      cmds.Add("\"SetLED\", ServoPort, true|false");
-      cmds.Add("\"TorqueEnable\", ServoPort, true|false");
-      cmds.Add("\"WriteRamByte\", ServoPort, Address, Value");
-      cmds.Add("\"WriteRamUInt16\", ServoPort, Address, Value");
-      cmds.Add("\"WriteRamInt32\", ServoPort, Address, Value");
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "TorqueEnable",
+          Params = new string[] {
+            "ServoPort",
+            "true|false"
+            },
+          Description = "Enable or disable the torque which releases the servo if disabled",
+        });
 
-      return cmds.ToArray();
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "ReadRam",
+          Params = new string[] {
+            "ServoPort",
+            "Address",
+            "BytesToRead"
+          },
+          Description = "read the number of bytes from the specified address of the servo port.",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "ReadRamByte",
+          Params = new string[] {
+            "ServoPort",
+            "Address",
+          },
+          Description = "read a byte from the specified address of the servo port.",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "ReadRamUInt16",
+          Params = new string[] {
+            "ServoPort",
+            "Address",
+          },
+          Description = "read a uint16 from the specified address of the servo port.",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "ReadRamInt16",
+          Params = new string[] {
+            "ServoPort",
+            "Address",
+          },
+          Description = "read a int16 byte from the specified address of the servo port.",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "ReadRamInt32",
+          Params = new string[] {
+            "ServoPort",
+            "Address",
+          },
+          Description = "read a int32 from the specified address of the servo port.",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "WriteRamByte",
+          Params = new string[] {
+            "ServoPort",
+            "Address",
+            "Value"
+          },
+          Description = "write a value byte to the ram at the specified address",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "WriteRamUInt16",
+          Params = new string[] {
+            "ServoPort",
+            "Address",
+            "Value"
+          },
+          Description = "write a value unsigned int16 to the ram at the specified address",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "WriteRamInt32",
+          Params = new string[] {
+            "ServoPort",
+            "Address",
+            "Value"
+          },
+          Description = "write a value signed int32 to the ram at the specified address",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "GetDynamixelTemp",
+          Params = new string[] {
+            "ServoPort",
+          },
+          ResponseType = typeof(int),
+          Description = "Returns the temp of the dynamixel servo at the specified port.",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "GetDynamixelLoadDir",
+          Params = new string[] {
+            "ServoPort",
+          },
+          ResponseType = typeof(string),
+          Description = "Returns the direction of load from the servo at the specified port.",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "GetDynamixelLoad",
+          Params = new string[] {
+            "ServoPort",
+          },
+          ResponseType = typeof(int),
+          Description = "Returns the load value from the servo at the specified port.",
+        });
+
+      items.Add(
+        new GetSupportedControlCommandsDefCls() {
+          Command = "GetDynamixelPing",
+          Params = new string[] {
+            "ServoPort",
+          },
+          ResponseType = typeof(bool),
+          Description = "Returns the ping result of the servo.",
+        });
     }
 
     private void Servo_OnServoGetPosition(Servo.ServoPortEnum servoPort, EZ_B.Classes.GetServoValueResponse getServoResponse) {
@@ -323,34 +696,57 @@ namespace Dynamixel {
       if (getServoResponse.Success)
         return;
 
-      if (!EZBManager.EZBs[0].IsConnected) {
-
-        getServoResponse.Success = false;
-        getServoResponse.ErrorStr = "Not connected to EZB";
+      try {
 
         if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-          Invokers.SetAppendText(tbLog, true, $"Not connected to EZB");
+          Invokers.SetAppendText(tbLog, true, $"Get servo position requested for {servoPort}");
 
-        return;
+        if (!EZBManager.EZBs[0].IsConnected)
+          throw new Exception("Not connected to EZB");
+
+        var servoConfig = _configServos.GetPort(servoPort);
+
+        if (servoConfig == null)
+          throw new Exception($"Port {servoPort} is not configured as a dynamixel servo");
+
+        var id = Utility.GetIdFromServo(servoPort);
+
+        ushort resp;
+
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          resp = _servo_AX12.GetCurrentPosition(id);
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          resp = _servoXL430_w250_t.GetCurrentPosition(id);
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.XL_320)
+          resp = _servoXL_320.GetCurrentPosition(id);
+        else
+          throw new Exception($"Get servo position not supported for {servoConfig.ServoType}");
+
+        var scaled =  (int)EZ_B.Functions.RemapScalar(resp, 1, servoConfig.MaxPosition, Servo.SERVO_MIN, Servo.SERVO_MAX);
+
+        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+          Invokers.SetAppendText(tbLog, true, $"Position for {servoConfig.ServoType} is raw: {resp} scaled: {scaled}");
+
+        getServoResponse.Success = true;
+        getServoResponse.Position = scaled;
+      } catch (Exception ex) {
+
+        getServoResponse.Success = false;
+        getServoResponse.ErrorStr = ex.Message;
+
+        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+          Invokers.SetAppendText(tbLog, true, $"Get servo position error: {ex.Message}");
       }
-
-      var resp = getServoPosition(servoPort);
-
-      getServoResponse.Success = resp.Success;
-      getServoResponse.Position = resp.Position;
-      getServoResponse.ErrorStr = resp.ErrorStr;
     }
 
     void Servo_OnServoRelease(Servo.ServoPortEnum[] servos) {
-
-      List<byte> cmdData = new List<byte>();
 
       foreach (var servoPort in servos) {
 
         if (servoPort < EZ_B.Servo.ServoPortEnum.V1 || servoPort > EZ_B.Servo.ServoPortEnum.V99)
           continue;
 
-        var servoConfig = _servoConfig.GetPort(servoPort);
+        var servoConfig = _configServos.GetPort(servoPort);
 
         if (servoConfig == null)
           continue;
@@ -358,147 +754,127 @@ namespace Dynamixel {
         if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
           Invokers.SetAppendText(tbLog, true, $"Release servo for {servoConfig.ServoType} {servoPort}");
 
-        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
-          cmdData.AddRange(_servo_AX12.ReleaseServo(Utility.GetIdFromServo(servoConfig.Port)));
-        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
-          cmdData.AddRange(_servoXL430_w250_t.ReleaseServo(Utility.GetIdFromServo(servoConfig.Port)));
-        else
-          cmdData.AddRange(_servoXL_320.ReleaseServo(Utility.GetIdFromServo(servoConfig.Port)));
-      }
+        var id = Utility.GetIdFromServo(servoConfig.Port);
 
-      if (cmdData.Count != 0)
-        serialWrite(cmdData.ToArray());
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          serialWrite(_servo_AX12.ReleaseTorque(id));
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          serialWrite(_servoXL430_w250_t.SetTorqueEnable(id, 0));
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.XL_320)
+          serialWrite(_servoXL_320.DisableTorque(id));
+        else
+          throw new Exception($"Release servo not supported for {servoConfig.ServoType}");
+      }
     }
 
     void Servo_OnServoSpeed(EZ_B.Classes.ServoSpeedItem[] servos) {
 
-      List<byte> cmdData = new List<byte>();
-
       foreach (var servo in servos) {
+
+        if (servo.Speed == -1)
+          continue;
 
         if (servo.Port < EZ_B.Servo.ServoPortEnum.V1 || servo.Port > EZ_B.Servo.ServoPortEnum.V99)
           continue;
 
-        var servoConfig = _servoConfig.GetPort(servo.Port);
+        var servoConfig = _configServos.GetPort(servo.Port);
 
         if (servoConfig == null)
           continue;
 
-        if (servo.Speed == -1) {
+        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+          Invokers.SetAppendText(tbLog, true, $"Speed servo for {servoConfig.ServoType} {servo.Port} to {servo.Speed}");
 
-          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-            Invokers.SetAppendText(tbLog, true, $"Set servo speed {servoConfig.ServoType} {servo.Port} to {servo.Speed} (skipping)");
-        } else {
+        var id = Utility.GetIdFromServo(servoConfig.Port);
 
-          int speed = servo.Speed * 51;
-
-          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-            Invokers.SetAppendText(tbLog, true, $"Set servo speed {servoConfig.ServoType} {servo.Port} to {servo.Speed} ({speed})");
-
-          if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
-            cmdData.AddRange(_servo_AX12.ServoSpeed(Utility.GetIdFromServo(servo.Port), speed));
-          else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
-            cmdData.AddRange(_servoXL430_w250_t.ServoSpeed(Utility.GetIdFromServo(servo.Port), speed));
-          else
-            cmdData.AddRange(_servoXL_320.ServoSpeed(Utility.GetIdFromServo(servo.Port), speed));
-        }
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          serialWrite(_servo_AX12.SetMovingSpeed(id, servo.Speed));
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          serialWrite(_servoXL430_w250_t.SetSpeed(id, servo.Speed));
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.XL_320)
+          serialWrite(_servoXL_320.SetMovingSpeed(id, servo.Speed));
+        else
+          throw new Exception($"Speed servo not supported for {servoConfig.ServoType}");
       }
-
-      if (cmdData.Count != 0)
-        serialWrite(cmdData.ToArray());
     }
 
     private void Servo_OnServoVelocity(EZ_B.Classes.ServoVelocityItem[] servos) {
 
-      List<byte> cmdData = new List<byte>();
-
       foreach (var servo in servos) {
+
+        if (servo.Velocity == -1)
+          continue;
 
         if (servo.Port < EZ_B.Servo.ServoPortEnum.V1 || servo.Port > EZ_B.Servo.ServoPortEnum.V99)
           continue;
 
-        var servoConfig = _servoConfig.GetPort(servo.Port);
+        var servoConfig = _configServos.GetPort(servo.Port);
 
         if (servoConfig == null)
           continue;
 
-        if (servo.Velocity == -1) {
+        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+          Invokers.SetAppendText(tbLog, true, $"Velocity servo for {servoConfig.ServoType} {servo.Port} to {servo.Velocity}");
 
-          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-            Invokers.SetAppendText(tbLog, true, $"Set servo velocity {servoConfig.ServoType} {servo.Port} to {servo.Velocity} (skipping)");
-        } else {
+        var id = Utility.GetIdFromServo(servoConfig.Port);
 
-          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-            Invokers.SetAppendText(tbLog, true, $"Set servo velocity {servoConfig.ServoType} {servo.Port} to {servo.Velocity}");
-
-          if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t) {
-
-            cmdData.AddRange(_servoXL430_w250_t.ServoVelocity(Utility.GetIdFromServo(servo.Port), servo.Velocity));
-          } else {
-
-            if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-              Invokers.SetAppendText(tbLog, true, $"{servoConfig.ServoType} does not support Velocity");
-          }
-        }
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+          serialWrite(_servo_AX12.SetMovingSpeed(id, servo.Velocity));
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          serialWrite(_servoXL430_w250_t.SetSpeed(id, servo.Velocity));
+        else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.XL_320)
+          serialWrite(_servoXL_320.SetMovingSpeed(id, servo.Velocity));
+        else
+          throw new Exception($"Velocity servo not supported for {servoConfig.ServoType}");
       }
-
-      if (cmdData.Count != 0)
-        serialWrite(cmdData.ToArray());
     }
 
     private void Servo_OnServoAcceleration(EZ_B.Classes.ServoAccelerationItem[] servos) {
 
-      List<byte> cmdData = new List<byte>();
-
       foreach (var servo in servos) {
+
+        if (servo.Acceleration == -1)
+          continue;
 
         if (servo.Port < EZ_B.Servo.ServoPortEnum.V1 || servo.Port > EZ_B.Servo.ServoPortEnum.V99)
           continue;
 
-        var servoConfig = _servoConfig.GetPort(servo.Port);
+        var servoConfig = _configServos.GetPort(servo.Port);
 
         if (servoConfig == null)
           continue;
 
-        if (servo.Acceleration == -1) {
+        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+          Invokers.SetAppendText(tbLog, true, $"Acceleration servo for {servoConfig.ServoType} {servo.Port} to {servo.Acceleration}");
 
-          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-            Invokers.SetAppendText(tbLog, true, $"Set servo acceleration {servoConfig.ServoType} {servo.Port} to {servo.Acceleration} (skipping)");
-        } else {
+        var id = Utility.GetIdFromServo(servoConfig.Port);
 
-          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-            Invokers.SetAppendText(tbLog, true, $"Set servo acceleration {servoConfig.ServoType} {servo.Port} to {servo.Acceleration}");
-
-          if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t) {
-
-            cmdData.AddRange(_servoXL430_w250_t.ServoAcceleration(Utility.GetIdFromServo(servo.Port), servo.Acceleration));
-          } else {
-
-            if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-              Invokers.SetAppendText(tbLog, true, $"{servoConfig.ServoType} does not support Acceleration");
-          }
-        }
+        if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+          serialWrite(_servoXL430_w250_t.SetAcceleration(id, servo.Acceleration));
+        else
+          throw new Exception($"Acceleration servo not supported for {servoConfig.ServoType}");
       }
-
-      if (cmdData.Count != 0)
-        serialWrite(cmdData.ToArray());
     }
 
     void Servo_OnServoMove(EZ_B.Classes.ServoPositionItem[] servos) {
-
-      List<byte> cmdData = new List<byte>();
 
       foreach (var servo in servos) {
 
         if (servo.Port < Servo.ServoPortEnum.V1 || servo.Port > Servo.ServoPortEnum.V99)
           continue;
 
-        var servoConfig = _servoConfig.GetPort(servo.Port);
+        var servoConfig = _configServos.GetPort(servo.Port);
 
         if (servoConfig == null)
           continue;
 
+        byte id = Utility.GetIdFromServo(servo.Port);
+
         if (servoConfig.OperatingMode == ConfigServos.OperatingModeEnum.Position) {
+
+          int position = (int)EZ_B.Functions.RemapScalar(servo.Position, Servo.SERVO_MIN, Servo.SERVO_MAX, 0, servoConfig.MaxPosition - 1);
+
+          // POSITION SERVO MODE
 
           if (servo.Speed != -1)
             Servo_OnServoSpeed(
@@ -518,14 +894,12 @@ namespace Dynamixel {
                 new EZ_B.Classes.ServoAccelerationItem(servo.Port, servo.Acceleration)
             });
 
-          int position = (int)EZ_B.Functions.RemapScalar(servo.Position, Servo.SERVO_MIN, Servo.SERVO_MAX, 0, servoConfig.MaxPosition - 1);
-
           if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
             Invokers.SetAppendText(tbLog, true, $"Set servo position (Position mode) {servoConfig.ServoType} {servo.Port} to {servo.Position} ({position})");
 
           if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12) {
 
-            cmdData.AddRange(_servo_AX12.MoveServoCmd(Utility.GetIdFromServo(servo.Port), position));
+            serialWrite(_servo_AX12.SetGoalPosition(id, position));
           } else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t) {
 
             if (EZBManager.EZBs[0].Servo.IsServoReleased(servo.Port)) {
@@ -533,20 +907,17 @@ namespace Dynamixel {
               if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
                 Invokers.SetAppendText(tbLog, true, $"Enable torque {servoConfig.ServoType} {servo.Port}");
 
-              cmdData.AddRange(_servoXL430_w250_t.TorqueEnable(Utility.GetIdFromServo(servo.Port), true));
+              serialWrite(_servoXL430_w250_t.SetTorqueEnable(id, 1));
             }
 
-            cmdData.AddRange(_servoXL430_w250_t.MoveServoCmd(Utility.GetIdFromServo(servo.Port), position));
+            serialWrite(_servoXL430_w250_t.SetGoalPosition(id, position));
           } else {
 
-            cmdData.AddRange(_servoXL_320.MoveServoCmd(Utility.GetIdFromServo(servo.Port), position));
+            serialWrite(_servoXL_320.SetGoalPosition(id, position));
           }
         } else {
 
-          int velocity = (int)EZ_B.Functions.RemapScalar(servo.Position, Servo.SERVO_MIN, Servo.SERVO_MAX, -134, 134);
-
-          if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-            Invokers.SetAppendText(tbLog, true, $"Set servo velocity (Wheel mode) {servoConfig.ServoType} {servo.Port} to {servo.Position} ({velocity})");
+          // WHEEL SERVO MODE (velocity mode)
 
           if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t) {
 
@@ -555,67 +926,20 @@ namespace Dynamixel {
               if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
                 Invokers.SetAppendText(tbLog, true, $"Enable torque {servoConfig.ServoType} {servo.Port}");
 
-              cmdData.AddRange(_servoXL430_w250_t.TorqueEnable(Utility.GetIdFromServo(servo.Port), true));
+              serialWrite(_servoXL430_w250_t.SetTorqueEnable(id, 1));
             }
 
-            cmdData.AddRange(_servoXL430_w250_t.GoalVelocity(Utility.GetIdFromServo(servo.Port), velocity));
-          } else {
+            int velocity = (int)EZ_B.Functions.RemapScalar(servo.Position, Servo.SERVO_MIN, Servo.SERVO_MAX, -480, 480);
 
             if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-              Invokers.SetAppendText(tbLog, true, $"Wheeled operating mode not implemented for {servoConfig.ServoType} on {servo.Port}");
+              Invokers.SetAppendText(tbLog, true, $"Set servo velocity (Wheel mode) {servoConfig.ServoType} {servo.Port} to {servo.Position} ({velocity})");
+
+            serialWrite(_servoXL430_w250_t.SetGoalVelocity(id, velocity));
+          } else {
+
+            Invokers.SetAppendText(tbLog, true, $"Wheeled operating mode not implemented for {servoConfig.ServoType} on {servo.Port}");
           }
         }
-      }
-
-      if (cmdData.Count != 0)
-        serialWrite(cmdData.ToArray());
-    }
-
-    Servo.ServoPortEnum getCmdParameterPort(object[] parameters) {
-
-      if (parameters.Length != 1)
-        throw new Exception("Requires only 1 parameter, which is the virtual servo (i.e. V1)");
-
-      var port = (Servo.ServoPortEnum)Enum.Parse(typeof(EZ_B.Servo.ServoPortEnum), parameters[0].ToString(), true);
-
-      if (port < Servo.ServoPortEnum.V1 || port > Servo.ServoPortEnum.V99)
-        throw new Exception("Servo must be a Vxx servo between V1 and V99");
-
-      return port;
-    }
-
-    private void FunctionEval_AdditionalFunctionEvent(object sender, ExpressionEvaluation.AdditionalFunctionEventArgs e) {
-
-      if (e.Name.Equals("GetDynamixelTemp", StringComparison.InvariantCultureIgnoreCase)) {
-
-        var port = getCmdParameterPort(e.Parameters);
-
-        e.ReturnValue = getServoTemp(port);
-      } else if (e.Name.Equals("GetDynamixelLoadDir", StringComparison.InvariantCultureIgnoreCase)) {
-
-        var port = getCmdParameterPort(e.Parameters);
-
-        e.ReturnValue = getLoad(port).LoadDirection;
-      } else if (e.Name.Equals("GetDynamixelLoad", StringComparison.InvariantCultureIgnoreCase)) {
-
-        var port = getCmdParameterPort(e.Parameters);
-
-        e.ReturnValue = getLoad(port).Load;
-      } else if (e.Name.Equals("GetDynamixelPing", StringComparison.InvariantCultureIgnoreCase)) {
-
-        var port = getCmdParameterPort(e.Parameters);
-
-        e.ReturnValue = getServoPing(port);
-      } else if (e.Name.Equals("GetDynamixelPosition", StringComparison.InvariantCultureIgnoreCase)) {
-
-        var port = getCmdParameterPort(e.Parameters);
-
-        var resp = getServoPosition(port);
-
-        if (!resp.Success)
-          throw new Exception("Servo did not respond");
-
-        e.ReturnValue = resp.Position;
       }
     }
 
@@ -627,11 +951,7 @@ namespace Dynamixel {
 
         if (form.ShowDialog() == System.Windows.Forms.DialogResult.OK) {
 
-          _cf = form.GetConfiguration();
-
-          _servoConfig = (ConfigServos)_cf.GetCustomObjectV2(typeof(ConfigServos));
-
-          initUART(false);
+          SetConfiguration(form.GetConfiguration());
         }
       }
     }
@@ -654,242 +974,81 @@ namespace Dynamixel {
       }
     }
 
-    EZ_B.Classes.GetServoValueResponse getServoPosition(Servo.ServoPortEnum servo) {
+    bool getServoPing(Servo.ServoPortEnum servo) {
 
-      if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-        Invokers.SetAppendText(tbLog, true, $"Get servo position requested for {servo}");
+      var servoConfig = _configServos.GetPort(servo);
 
-      var resp = new EZ_B.Classes.GetServoValueResponse();
-
-      if (((ConfigTitles.PortTypeEnum)_cf.STORAGE[ConfigTitles.PORT_TYPE]) == ConfigTitles.PortTypeEnum.DigitalPort) {
-
-        resp.ErrorStr = "This feature is only available when using the hardware uart";
-        resp.Success = false;
-
-        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-          Invokers.SetAppendText(tbLog, true, resp.ErrorStr);
-
-        return resp;
-      }
-
-      var servoConfig = _servoConfig.GetPort(servo);
-
-      if (servoConfig == null) {
-
-        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-          Invokers.SetAppendText(tbLog, true, $"Servo is not configured as a dynamixel: {servo}");
-
-        resp.ErrorStr = "Not the correct servo";
-        resp.Success = false;
-
-        return resp;
-      }
+      if (servoConfig == null)
+        throw new Exception($"Port {servo} is not configured as a dynamixel servo");
 
       var id = Utility.GetIdFromServo(servo);
 
-      // initialize the servo port only to flush the input buffer
-      initUART(true);
+      if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+        Invokers.SetAppendText(tbLog, true, $"Ping requested for {servoConfig.ServoType} {servo}");
 
-      if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12) {
+      bool resp;
 
-        serialWrite(_servo_AX12.GetCurrentPositionCmd(id));
+      if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
+        resp = _servo_AX12.Ping(id);
+      else
+        resp = _servoXL430_w250_t.Ping(id);
 
-        System.Threading.Thread.Sleep(100);
-
-        var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-        if (ret.Length != 16) {
-
-          resp.ErrorStr = "Servo did not respond";
-          resp.Success = false;
-        } else {
-
-          resp.Position = (int)EZ_B.Functions.RemapScalar(BitConverter.ToUInt16(ret, 13), 1, servoConfig.MaxPosition, Servo.SERVO_MIN, Servo.SERVO_MAX);
-          resp.Success = true;
-        }
-      } else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t) {
-
-        serialWrite(_servoXL430_w250_t.GetCurrentPositionCmd(id));
-
-        System.Threading.Thread.Sleep(100);
-
-        var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-        if (ret.Length != 29) {
-
-          resp.ErrorStr = "Servo did not respond";
-          resp.Success = false;
-        } else {
-
-          resp.Position = (int)EZ_B.Functions.RemapScalar(BitConverter.ToUInt16(ret, 23), 1, servoConfig.MaxPosition, Servo.SERVO_MIN, Servo.SERVO_MAX);
-          resp.Success = true;
-        }
-      } else {
-
-        serialWrite(_servoXL_320.GetCurrentPositionCmd(id));
-
-        System.Threading.Thread.Sleep(100);
-
-        var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-        if (ret.Length != 27) {
-
-          resp.ErrorStr = "Servo did not respond";
-          resp.Success = false;
-        } else {
-
-          int tmpPost = ret[22] << 8 | ret[23];
-
-          resp.Position = (int)EZ_B.Functions.RemapScalar(BitConverter.ToUInt16(ret, 23), 1, servoConfig.MaxPosition, Servo.SERVO_MIN, Servo.SERVO_MAX);
-          resp.Success = true;
-        }
-      }
-
-      if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG])) {
-
-        if (resp.Success)
-          Invokers.SetAppendText(tbLog, true, $"Position for {servoConfig.ServoType} is: {resp.Position}");
-        else
-          Invokers.SetAppendText(tbLog, true, resp.ErrorStr);
-      }
+      if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+        Invokers.SetAppendText(tbLog, true, $"Response: {resp}");
 
       return resp;
     }
 
-    bool getServoPing(Servo.ServoPortEnum servo) {
-
-      if (((ConfigTitles.PortTypeEnum)_cf.STORAGE[ConfigTitles.PORT_TYPE]) == ConfigTitles.PortTypeEnum.DigitalPort)
-        throw new Exception("Servo ping is only available when using the hardware uart");
-
-      var servoConfig = _servoConfig.GetPort(servo);
-
-      if (servoConfig == null)
-        throw new Exception("No servo configured for this ID to ping");
-
-      var id = Utility.GetIdFromServo(servo);
-
-      if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-        Invokers.SetAppendText(tbLog, true, $"Ping {servoConfig.ServoType} {servo}");
-      
-      // initialize the servo only to flush the data buffer
-      initUART(true);
-
-      if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12) {
-
-        serialWrite(_servo_AX12.SendPing(id));
-
-        System.Threading.Thread.Sleep(500);
-
-        var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-        if (ret.Length < 12)
-          return false;
-        else if (ret.Length > 12)
-          throw new Exception("More than one servo responded on this id");
-      } else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t) {
-
-        serialWrite(_servoXL430_w250_t.SendPing(id));
-
-        System.Threading.Thread.Sleep(500);
-
-        var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-        if (ret.Length < 24)
-          return false;
-        else if (ret.Length > 24)
-          throw new Exception("More than one servo responded on this id");
-      } else {
-
-        serialWrite(_servoXL_320.SendPing(id));
-
-        System.Threading.Thread.Sleep(500);
-
-        var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-        if (ret.Length < 24)
-          return false;
-        else if (ret.Length > 24)
-          throw new Exception("More than one servo responded on this id");
-      }
-
-      return true;
-    }
-
     int getServoTemp(Servo.ServoPortEnum servo) {
 
-      if (((ConfigTitles.PortTypeEnum)_cf.STORAGE[ConfigTitles.PORT_TYPE]) == ConfigTitles.PortTypeEnum.DigitalPort)
-        throw new Exception("This feature is only available when using the hardware uart");
-
-      var servoConfig = _servoConfig.GetPort(servo);
+      var servoConfig = _configServos.GetPort(servo);
 
       if (servoConfig == null)
-        throw new Exception("No servo configured for this ID to get temp");
+        throw new Exception($"Port {servo} is not configured as a dynamixel servo");
 
       var id = Utility.GetIdFromServo(servo);
 
       if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
         Invokers.SetAppendText(tbLog, true, $"Get temp requested for {servoConfig.ServoType} {servo}");
 
-      // initialize the servo only to flush the data buffer
-      initUART(true);
+      byte resp;
 
       if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
-        serialWrite(_servo_AX12.GetTemp(id));
+        resp = _servo_AX12.GetTemperature(id);
+      else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+        resp = _servoXL430_w250_t.GetTemperature(id);
       else
-        throw new Exception($"Get temp is not supported for {servoConfig.ServoType}");
+        throw new Exception($"Get temp not supported for {servoConfig.ServoType}");
 
-      System.Threading.Thread.Sleep(500);
+      if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+        Invokers.SetAppendText(tbLog, true, $"Response: {resp}");
 
-      var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-      if (ret.Length != 15)
-        throw new Exception($"Servo did not respond. Expected 15 bytes got {ret.Length}");
-
-      return ret[13];
+      return resp;
     }
 
     GetLoadResponseCls getLoad(Servo.ServoPortEnum servo) {
 
-      if (((ConfigTitles.PortTypeEnum)_cf.STORAGE[ConfigTitles.PORT_TYPE]) == ConfigTitles.PortTypeEnum.DigitalPort)
-        throw new Exception("This feature is only available when using the hardware uart");
-
-      var servoConfig = _servoConfig.GetPort(servo);
+      var servoConfig = _configServos.GetPort(servo);
 
       if (servoConfig == null)
-        throw new Exception("No servo configured for this ID to get load");
+        throw new Exception($"Port {servo} is not configured as a dynamixel servo");
 
       var id = Utility.GetIdFromServo(servo);
 
       if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
         Invokers.SetAppendText(tbLog, true, $"Get load requested for {servoConfig.ServoType} {servo}");
 
-      // initialize the servo only to flush the data buffer
-      initUART(true);
+      GetLoadResponseCls resp;
 
       if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.AX_12)
-        serialWrite(_servo_AX12.GetLoad(id));
+        resp = _servo_AX12.GetLoad(id);
+      else if (servoConfig.ServoType == ConfigServos.ServoTypeEnum.xl430_w250_t)
+        resp = _servoXL430_w250_t.GetPresentLoad(id);
       else
         throw new Exception($"Get load not supported for {servoConfig.ServoType}");
 
-      System.Threading.Thread.Sleep(1000);
-
-      var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-      if (ret.Length != 16)
-        throw new Exception($"Servo did not respond. Expected 16 bytes got {ret.Length}");
-
-      var pos = BitConverter.ToUInt16(ret, 13);
-
-      bool dir = Functions.IsBitSet(pos, 10);
-
-      int load = pos & 0x1ff;
-
-      var resp = new GetLoadResponseCls();
-      resp.Load = load;
-      resp.LoadDirection = dir ? GetLoadResponseCls.LoadDirectionEnum.Clockwise : GetLoadResponseCls.LoadDirectionEnum.CounterClockwise;
-
       if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
-        Invokers.SetAppendText(tbLog, true, $"Load response: {resp.Load} / {resp.LoadDirection}");
+        Invokers.SetAppendText(tbLog, true, $"Response: {resp.Load} / {resp.LoadDirection}");
 
       return resp;
     }

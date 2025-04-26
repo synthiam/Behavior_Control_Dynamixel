@@ -57,6 +57,7 @@
   <ItemGroup>
     <Compile Include="ConfigServos.cs" />
     <Compile Include="ConfigTitles.cs" />
+    <Compile Include="OnCommCls.cs" />
     <Compile Include="Servo_AX12.cs" />
     <Compile Include="Servo_xl430_w250_t.cs" />
     <Compile Include="Servo_XL_320.cs" />

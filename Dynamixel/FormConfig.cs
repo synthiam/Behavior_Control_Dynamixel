@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 using ARC;
 using ARC.Config.Sub;
@@ -10,9 +11,10 @@ namespace Dynamixel {
   public partial class FormConfig : Form {
 
     PluginV1    _cf = new PluginV1();
-    Servo_AX12 _servoAX12 = new Servo_AX12();
-    Servo_XL_320 _servoXL_320 = new Servo_XL_320();
-    Servo_xl430_w250_t _servoXL430_w250_t = new Servo_xl430_w250_t();
+
+    Servo_AX12 _servo_AX12;
+    Servo_XL_320 _servoXL_320;
+    Servo_xl430_w250_t _servoXL430_w250_t;
 
     public FormConfig() {
 
@@ -59,10 +61,22 @@ namespace Dynamixel {
       cbChangeIDNew.SelectedItem = Servo.ServoPortEnum.V2;
       cbTestServoPort.SelectedItem = Servo.ServoPortEnum.V1;
       cbVersion.SelectedItem = ConfigServos.ServoTypeEnum.AX_12;
+
+      _servo_AX12 = new Servo_AX12();
+      _servo_AX12.OnCommunication += onCommunication;
+
+      _servoXL_320 = new Servo_XL_320();
+      _servoXL_320.OnCommunication += onCommunication;
+
+      _servoXL430_w250_t = new Servo_xl430_w250_t();
+      _servoXL430_w250_t.OnCommunication += onCommunication;
     }
 
     private void Form_FormClosing(object sender, FormClosingEventArgs e) {
 
+      _servo_AX12.OnCommunication -= onCommunication;
+      _servoXL_320.OnCommunication -= onCommunication;
+      _servoXL430_w250_t.OnCommunication -= onCommunication;
     }
 
     public void SetConfiguration(PluginV1 cf) {
@@ -169,6 +183,35 @@ namespace Dynamixel {
         return 2;
     }
 
+    void initUART() {
+
+      EZBManager.EZBs[0].Uart.UARTExpansionInit(getUARTIndex(), Convert.ToUInt32(tbBaudRate.Text));
+    }
+
+    private void onCommunication(object sender, OnCommCls e) {
+
+      bool debug = Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]);
+
+      if (((ConfigTitles.PortTypeEnum)_cf.STORAGE[ConfigTitles.PORT_TYPE]) == ConfigTitles.PortTypeEnum.DigitalPort)
+        throw new Exception("This feature is only available when using the hardware uart");
+
+      if (debug)
+        Invokers.SetAppendText(tbLog, true, $"Performing a request to servo...");
+
+      initUART();
+
+      serialWrite(e.SendBytes);
+
+      System.Threading.Thread.Sleep(500);
+
+      var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
+
+      if (debug)
+        Invokers.SetAppendText(tbLog, true, $"Read {ret.Length} bytes.");
+
+      e.ResponseBytes = ret.Skip(e.SendBytes.Length).ToArray();
+    }
+
     void serialWrite(byte[] data) {
 
       if (rbDigitalPort.Checked) {
@@ -200,9 +243,9 @@ namespace Dynamixel {
         var servoVersion = (ConfigServos.ServoTypeEnum)cbVersion.SelectedItem;
 
         if (servoVersion == ConfigServos.ServoTypeEnum.AX_12)
-          serialWrite(_servoAX12.ChangeID(fromId, toId));
+          serialWrite(_servo_AX12.ChangeID(fromId, toId));
         else if (servoVersion == ConfigServos.ServoTypeEnum.xl430_w250_t)
-          serialWrite(_servoXL430_w250_t.ChangeID(fromId, toId));
+          serialWrite(_servoXL430_w250_t.SetServoID(fromId, toId));
         else
           serialWrite(_servoXL_320.ChangeID(fromId, toId));
 
@@ -221,11 +264,11 @@ namespace Dynamixel {
         var servoVersion = (ConfigServos.ServoTypeEnum)cbVersion.SelectedItem;
 
         if (servoVersion == ConfigServos.ServoTypeEnum.AX_12)
-          serialWrite(_servoAX12.LED(id, true));
+          serialWrite(_servo_AX12.SetLED(id, true));
         else if (servoVersion == ConfigServos.ServoTypeEnum.xl430_w250_t)
-          serialWrite(_servoXL430_w250_t.LED(id, true));
+          serialWrite(_servoXL430_w250_t.SetLED(id, 1));
         else
-          serialWrite(_servoXL_320.LED(id, true));
+          serialWrite(_servoXL_320.SetLED(id, true));
       } catch (Exception ex) {
 
         MessageBox.Show(ex.Message);
@@ -240,11 +283,11 @@ namespace Dynamixel {
         var servoVersion = (ConfigServos.ServoTypeEnum)cbVersion.SelectedItem;
 
         if (servoVersion == ConfigServos.ServoTypeEnum.AX_12)
-          serialWrite(_servoAX12.LED(id, false));
+          serialWrite(_servo_AX12.SetLED(id, false));
         else if (servoVersion == ConfigServos.ServoTypeEnum.xl430_w250_t)
-          serialWrite(_servoXL430_w250_t.LED(id, false));
+          serialWrite(_servoXL430_w250_t.SetLED(id, 0));
         else
-          serialWrite(_servoXL_320.LED(id, false));
+          serialWrite(_servoXL_320.SetLED(id, false));
       } catch (Exception ex) {
 
         MessageBox.Show(ex.Message);
@@ -327,7 +370,7 @@ namespace Dynamixel {
           var baud = (Servo_AX12.BAUD_RATES)cbBaudRates.SelectedItem;
           var id = Utility.GetIdFromServo((Servo.ServoPortEnum)cbTestServoPort.SelectedItem);
 
-          serialWrite(_servoAX12.ChangeBaudRate(id, baud));
+          serialWrite(_servo_AX12.SetBaudRate(id, baud));
 
           MessageBox.Show("The baud rate has chnged. To communicate with this servo, you must change the baud rate in the first page of this configuration menu", "Done");
 
@@ -349,11 +392,11 @@ namespace Dynamixel {
         var servoVersion = (ConfigServos.ServoTypeEnum)cbVersion.SelectedItem;
 
         if (servoVersion == ConfigServos.ServoTypeEnum.AX_12)
-          serialWrite(_servoAX12.ReleaseServo(id));
+          serialWrite(_servo_AX12.ReleaseTorque(id));
         else if (servoVersion == ConfigServos.ServoTypeEnum.xl430_w250_t)
-          serialWrite(_servoXL430_w250_t.ReleaseServo(id));
+          serialWrite(_servoXL430_w250_t.SetTorqueEnable(id, 0));
         else
-          serialWrite(_servoXL_320.ReleaseServo(id));
+          serialWrite(_servoXL_320.DisableTorque(id));
       } catch (Exception ex) {
 
         MessageBox.Show(ex.Message);
@@ -367,48 +410,25 @@ namespace Dynamixel {
         if (rbDigitalPort.Checked)
           throw new Exception("This feature is only available when using the hardware uart");
 
+        initUART();
+
         EZBManager.EZBs[0].Uart.UARTExpansionInit(getUARTIndex(), Convert.ToUInt32(tbBaudRate.Text));
 
         var id = Utility.GetIdFromServo((Servo.ServoPortEnum)cbTestServoPort.SelectedItem);
         var servoVersion = (ConfigServos.ServoTypeEnum)cbVersion.SelectedItem;
 
-        if (servoVersion == ConfigServos.ServoTypeEnum.AX_12) {
+        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+          Invokers.SetAppendText(tbLog, true, $"Ping requested for {servoVersion} {id}");
 
-          serialWrite(_servoAX12.SendPing(id));
+        bool resp;
 
-          System.Threading.Thread.Sleep(1000);
+        if (servoVersion == ConfigServos.ServoTypeEnum.AX_12)
+          resp = _servo_AX12.Ping(id);
+        else
+          resp = _servoXL430_w250_t.Ping(id);
 
-          var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-          if (ret.Length < 12)
-            throw new Exception("Servo not responding");
-          else if (ret.Length > 12)
-            throw new Exception("Two more more servos responded with the same ID");
-        } else if (servoVersion == ConfigServos.ServoTypeEnum.xl430_w250_t) {
-
-          serialWrite(_servoXL430_w250_t.SendPing(id));
-
-          System.Threading.Thread.Sleep(500);
-
-          var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-          if (ret.Length < 24)
-            throw new Exception("Servo not responding");
-          else if (ret.Length > 24)
-            throw new Exception("Two more more servos responded with the same ID");
-        } else {
-
-          serialWrite(_servoXL_320.SendPing(id));
-
-          System.Threading.Thread.Sleep(500);
-
-          var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
-
-          if (ret.Length < 24)
-            throw new Exception("Servo not responding");
-          else if (ret.Length > 24)
-            throw new Exception("Two more more servos responded with the same ID");
-        }
+        if (Convert.ToBoolean(_cf.STORAGE[ConfigTitles.DEBUG]))
+          Invokers.SetAppendText(tbLog, true, $"Response: {resp}");
 
         Invokers.SetAppendText(tbLog, true, "{0} Responded to ping", (Servo.ServoPortEnum)cbTestServoPort.SelectedItem);
       } catch (Exception ex) {
@@ -432,7 +452,7 @@ namespace Dynamixel {
 
           EZBManager.EZBs[0].Uart.UARTExpansionInit(getUARTIndex(), Convert.ToUInt32(tbBaudRate.Text));
 
-          serialWrite(_servoAX12.SendPing(0xfe));
+          serialWrite(_servo_AX12.PingCmd(0xfe));
 
           System.Threading.Thread.Sleep(2000);
 
@@ -451,14 +471,19 @@ namespace Dynamixel {
 
           EZBManager.EZBs[0].Uart.UARTExpansionInit(getUARTIndex(), Convert.ToUInt32(tbBaudRate.Text));
 
-          serialWrite(_servoXL430_w250_t.SendPing(0xfe));
+          serialWrite(_servoXL430_w250_t.PingCmd(0xfe));
 
           System.Threading.Thread.Sleep(2000);
 
           var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
 
-          for (int cnt = 10; cnt < ret.Length; cnt += 14)
-            Invokers.SetAppendText(tbLog, true, "- XL430 or XL-320 found at ID {0}", ret[cnt + 4]);
+          for (int cnt = 10; cnt < ret.Length; cnt += 14) {
+
+            byte id = ret[cnt + 4];
+            var modelNo = _servoXL430_w250_t.GetModelNumber(id);
+
+            Invokers.SetAppendText(tbLog, true, $"- XL430 or XL-320 found at ID {id} (Model No: {modelNo})");
+          }
         }
 
         tbLog.AppendText(Environment.NewLine);
@@ -485,47 +510,54 @@ namespace Dynamixel {
 
       if ((ConfigServos.ServoTypeEnum)cbVersion.SelectedItem == ConfigServos.ServoTypeEnum.AX_12) {
 
-        serialWrite(_servoAX12.ResetToFactoryDefault(id));
+        serialWrite(_servo_AX12.ResetToFactoryDefaults(id));
+
+        MessageBox.Show("Servo restored to factory settings. Baud and ID are now changed to factory default values");
+      } else if ((ConfigServos.ServoTypeEnum)cbVersion.SelectedItem == ConfigServos.ServoTypeEnum.xl430_w250_t) {
+
+        serialWrite(_servoXL430_w250_t.ResetToFactoryDefault(id));
+
+        MessageBox.Show("Servo restored to factory settings except the Baudrate and ID have not changed.");
       } else {
 
-        MessageBox.Show("This servo type doesn't support this feature (yet). Ask for it");
-
-        return;
+        MessageBox.Show("This servo type doesn't support this feature (yet). Ask for it on the Dynamixel robot skill comments.");
       }
-
-      MessageBox.Show("Servo restored to factory settings. Baud and ID are now changed to factory default values");
     }
 
     private void Button2_Click(object sender, EventArgs e) {
 
-      EZBManager.EZBs[0].Uart.UARTExpansionInit(getUARTIndex(), Convert.ToUInt32(tbBaudRate.Text));
+      try {
 
-      var id = Utility.GetIdFromServo((Servo.ServoPortEnum)cbTestServoPort.SelectedItem);
+        var id = Utility.GetIdFromServo((Servo.ServoPortEnum)cbTestServoPort.SelectedItem);
 
-      if ((ConfigServos.ServoTypeEnum)cbVersion.SelectedItem == ConfigServos.ServoTypeEnum.AX_12) {
+        if ((ConfigServos.ServoTypeEnum)cbVersion.SelectedItem == ConfigServos.ServoTypeEnum.AX_12) {
 
-        serialWrite(_servoAX12.GetCurrentPositionCmd(id));
+          initUART();
 
-        System.Threading.Thread.Sleep(200);
+          var ret = _servo_AX12.GetCurrentPosition(id);
 
-        var ret = EZBManager.EZBs[0].Uart.UARTExpansionReadAvailable(getUARTIndex());
+          Invokers.SetAppendText(
+            tbLog,
+            true,
+            "Servo {0} Raw Position {1}",
+            id,
+            ret);
+        } else if ((ConfigServos.ServoTypeEnum)cbVersion.SelectedItem == ConfigServos.ServoTypeEnum.xl430_w250_t) {
 
-        if (ret.Length != 16) {
+          initUART();
 
-          Invokers.SetAppendText(tbLog, true, "Servo did not respond");
+          var ret = _servoXL430_w250_t.GetCurrentPosition(id);
 
-          return;
+          Invokers.SetAppendText(
+            tbLog,
+            true,
+            "Servo {0} Raw Position {1}",
+            id,
+            ret);
         }
+      } catch (Exception ex) {
 
-        Invokers.SetAppendText(
-          tbLog,
-          true,
-          "Servo {0} Raw Position {1}",
-          id,
-          BitConverter.ToUInt16(ret, 13));
-      } else {
-
-        return;
+        Invokers.SetAppendText(tbLog, true, ex.Message);
       }
     }
   }
